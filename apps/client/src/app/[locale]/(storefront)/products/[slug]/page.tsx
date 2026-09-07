@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { apiClient } from '@ezihubb/api-client';
 import { API_ROUTES } from '@ezihubb/constants';
-import { buildAlternates } from '../../../../../lib/seo';
+import { buildAlternates, serializeJsonLd } from '../../../../../lib/seo';
 import type { ProductDetailDto, ProductListItemDto, ReviewSummaryDto, CategoryDto } from '@ezihubb/types';
 import type { PaginatedResponse } from '@ezihubb/types';
 import { ProductBreadcrumb } from '../../../../../components/product/ProductBreadcrumb';
@@ -27,6 +27,7 @@ import { ListedInfoFooter } from '../../../../../components/product/ListedInfoFo
 import { ProductQandA } from '../../../../../components/product/ProductQandA';
 import type { QAItem } from '../../../../../components/product/ProductQandA';
 import { warnIfRejected } from '../../../../../lib/warn-if-rejected';
+import { getProductSeoPrice } from '../../../../../lib/product-pricing';
 
 // Product availability is correctness-sensitive: an archived or permanently
 // deleted listing must stop rendering immediately. Related/review/category
@@ -141,6 +142,7 @@ export async function generateMetadata({
     product.description?.slice(0, 160) ??
     `Shop ${product.name} — personalized and custom-made at EziHubb.`;
   const primaryImage = product.images?.[0];
+  const { price } = getProductSeoPrice(product);
 
   return {
     title: product.name,
@@ -150,15 +152,18 @@ export async function generateMetadata({
       title:       product.name,
       description,
       type:        'website',
-      url:         `/products/${slug}`,
+      url:         `/${locale}/products/${slug}`,
       images: primaryImage
         ? [{ url: primaryImage.url, width: 800, height: 800, alt: product.name }]
         : [{ url: '/og-default.jpg', width: 1200, height: 630 }],
     },
     alternates: buildAlternates(`/products/${slug}`, locale),
     other: {
-      'product:price:amount':   String(product.basePrice),
+      'product:price:amount':   String(price),
       'product:price:currency': 'USD',
+      'product:availability':   product.isActive ? 'in stock' : 'out of stock',
+      'product:condition':      'new',
+      'product:retailer_item_id': product.sku,
     },
   };
 }
@@ -281,8 +286,8 @@ export default async function ProductDetailPage({
       {faqStructuredData && faqStructuredData.mainEntity.length > 0 && (
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger -- static JSON.stringify output, not user input
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData) }}
+          // eslint-disable-next-line react/no-danger -- serializeJsonLd escapes buyer-provided Q&A text
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqStructuredData) }}
         />
       )}
 

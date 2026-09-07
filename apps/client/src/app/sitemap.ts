@@ -1,5 +1,10 @@
 ﻿import type { MetadataRoute } from 'next';
 import { API_ROUTES } from '@ezihubb/constants';
+import {
+  GIFT_GUIDE_SLUGS,
+  getGiftGuide,
+  isGiftGuideProduct,
+} from '../lib/gift-guides';
 
 export const revalidate = 3600; // regenerate hourly
 
@@ -132,6 +137,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Leaf categories only (level 3) — avoids duplicating parent-category content
   const leafCategories = categories.filter((c) => c.level === 3 || c.level === undefined);
+  // A guide with no live catalog would be an empty doorway. Its page metadata
+  // noindexes that state, and the sitemap must make the same decision.
+  const availableGiftGuideSlugs = GIFT_GUIDE_SLUGS.filter((slug) => {
+    const guide = getGiftGuide(slug);
+    return guide ? products.some((product) => isGiftGuideProduct(guide, product)) : false;
+  });
+  const giftGuideUrls = availableGiftGuideSlugs
+    .map((slug) => ({
+        url:             `${EN}/${slug}`,
+        changeFrequency: 'weekly' as const,
+        priority:        0.82,
+      }));
 
   return [
     // ── Priority 1.0: Homepage ──────────────────────────────────────────────
@@ -148,6 +165,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily' as const,
       priority:        0.9,
     })),
+
+    ...giftGuideUrls,
 
     // ── Priority 0.85: Product pages (with image sitemaps) ─────────────────
     ...products.map((p) => ({
@@ -221,6 +240,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'weekly' as const,
         priority:        0.4,
       })),
+      ...availableGiftGuideSlugs.map((slug) => ({
+            url:             `${BASE}/${locale}/${slug}`,
+            changeFrequency: 'weekly' as const,
+            priority:        0.55,
+          })),
     ]),
   ];
 }

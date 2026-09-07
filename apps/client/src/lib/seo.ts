@@ -1,6 +1,15 @@
 ﻿export const SEO_DOMAIN = 'https://ezihubb.com';
 
 /**
+ * Serialize JSON-LD safely for an inline script element. Escaping `<` keeps
+ * the JSON value unchanged while preventing seller-controlled text from
+ * creating a closing script tag in the HTML parser.
+ */
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+/**
  * Build canonical + hreflang alternates for a given site-relative path
  * (e.g. '/categories/mugs').
  *

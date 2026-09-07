@@ -2,6 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getTranslations, getLocale } from 'next-intl/server';
 import { CLIENT_ROUTES } from '@ezihubb/constants';
+import {
+  GIFT_GUIDE_SLUGS,
+  getGiftGuide,
+  getGiftGuideContent,
+} from '../../lib/gift-guides';
 
 // ── Social icon SVGs ──────────────────────────────────────────────────────────
 
@@ -81,6 +86,15 @@ export async function Footer() {
     { label: t('help.returns'),  href: `/${locale}${CLIENT_ROUTES.PAGE_RETURNS}`        },
   ];
 
+  const guideLinks = GIFT_GUIDE_SLUGS.map((slug) => {
+    const guide = getGiftGuide(slug);
+    if (!guide) return null;
+    return {
+      label: getGiftGuideContent(guide, locale).title,
+      href: `/${locale}/${slug}`,
+    };
+  }).filter((guide): guide is { label: string; href: string } => guide !== null);
+
   return (
     <footer className="bg-[#2D2D2D] text-white mt-auto">
       <div className="max-w-[1280px] mx-auto px-4 md:px-6 py-10 md:py-12">
@@ -152,6 +166,24 @@ export async function Footer() {
         </div>
 
         {/* ── Bottom bar ────────────────────────────────────────────────── */}
+        <nav
+          aria-label={locale === 'vi' ? 'Cẩm nang quà tặng' : locale === 'zh' ? '礼物指南' : 'Gift guides'}
+          className="mt-10 border-t border-[#3D3D4E] pt-6"
+        >
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-white">
+            {locale === 'vi' ? 'Cẩm nang quà tặng' : locale === 'zh' ? '礼物指南' : 'Gift guides'}
+          </p>
+          <ul className="flex flex-wrap gap-x-6 gap-y-3">
+            {guideLinks.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="text-sm text-[#D1D5DB] transition-colors hover:text-white">
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         <div className="mt-10 pt-6 border-t border-[#3D3D4E] flex flex-col sm:flex-row items-center justify-between gap-3 text-[#B7BDC7] text-xs">
           <p>{t('copyright', { year })}</p>
           <div className="flex gap-4">

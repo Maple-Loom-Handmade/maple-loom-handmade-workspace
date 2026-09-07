@@ -26,6 +26,7 @@ import { fmtRating, safeNum } from '@ezihubb/utils';
 import { useVariationPhoto } from './VariationPhotoContext';
 import { API_BASE } from '../../lib/api-client';
 import { API_ROUTES } from '@ezihubb/constants';
+import { applySalePrice } from '../../lib/product-pricing';
 
 // ── Date helpers (no date-fns) ────────────────────────────────────────────────
 
@@ -914,13 +915,10 @@ export function ProductPurchasePanel({ product, reviewSummary }: Props) {
   // (base or variant), same math as the server (checkout recomputes this
   // itself regardless, so this is purely a display preview).
   const salePromo = product.salePromo;
-  const currentPrice = useMemo(() => {
-    if (!salePromo) return rawPrice;
-    const discounted = salePromo.type === 'PERCENTAGE'
-      ? rawPrice - Math.round(rawPrice * salePromo.value) / 100
-      : Math.max(0, rawPrice - salePromo.value);
-    return Math.round(Math.max(0, discounted) * 100) / 100;
-  }, [rawPrice, salePromo]);
+  const currentPrice = useMemo(
+    () => applySalePrice(rawPrice, salePromo),
+    [rawPrice, salePromo],
+  );
   // The sale price becomes the new "current price", so the original
   // (seller's own price, or their manually-set compareAtPrice if higher)
   // becomes the struck-through reference.
