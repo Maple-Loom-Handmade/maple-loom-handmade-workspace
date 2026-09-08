@@ -237,7 +237,8 @@
     "addressBook": "地址簿",
     "profilePassword": "个人资料与密码",
     "myOffers": "我的还价",
-    "signOut": "退出登录"
+    "signOut": "退出登录",
+    "settings": "账户设置"
   },
   "offers": {
     "title": "我的还价",
@@ -345,5 +346,48 @@
     "nothingSavedHint": "收藏您喜欢的商品，方便以后查看。",
     "exploreGifts": "探索礼品",
     "savedItems": "件收藏商品"
+  },
+  "settings": {
+    "title": "账户设置",
+    "back": "返回账户",
+    "profile": "个人资料与安全",
+    "addresses": "地址",
+    "notifications": "通知",
+    "securityTitle": "保护您的账户",
+    "securityHint": "在个人资料中管理密码和账户信息。EziHubb 绝不会通过消息索要您的密码或完整支付信息。",
+    "securityNote": "暂不支持短信安全提醒。",
+    "manageSecurity": "管理账户",
+    "browserTitle": "浏览器通知",
+    "browserNote": "此设置适用于已注册的设备。您还需要在浏览器中允许通知；保存此设置不会自动授予浏览器权限。",
+    "emailTitle": "{email} 的邮件通知设置",
+    "emailWhen": "在以下情况下发送邮件…",
+    "essentialNote": "订单确认、支付和配送更新、密码重置及其他必要账户邮件仍会发送。这些设置不会隐藏账户内的消息或通知。",
+    "subscriptionsTitle": "优惠与购物提醒",
+    "subscriptionsHint": "选择是否接收可选的购物邮件。您可以随时更改选择。",
+    "pushEnabled": {
+      "label": "接收浏览器通知",
+      "hint": "在已启用通知的设备上接收消息和订单更新。"
+    },
+    "emailMessages": {
+      "label": "有人给我发送消息",
+      "hint": "店铺回复时接收邮件通知。"
+    },
+    "emailReviewReminders": {
+      "label": "提醒我评价购买的商品",
+      "hint": "订单送达后，接收分享购物体验的提醒。"
+    },
+    "emailOffers": {
+      "label": "优惠券、优惠及购物车提醒",
+      "hint": "接收店铺优惠和购物车商品提醒。关闭此选项后，您主动提交的议价请求仍会收到回复。"
+    },
+    "save": "保存设置",
+    "saving": "保存中…",
+    "saved": "您的设置已保存。",
+    "unsaved": "您有未保存的更改。",
+    "saveError": "无法保存设置。您的更改仍然保留，请重试。",
+    "loadError": "无法加载设置。",
+    "retry": "重试",
+    "loading": "正在加载设置",
+    "leaveWarning": "您有未保存的设置。是否放弃更改并离开？"
   }
 }

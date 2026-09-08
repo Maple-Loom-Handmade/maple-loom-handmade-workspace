@@ -101,6 +101,7 @@ export const CLIENT_ROUTES = {
 
   ACCOUNT:         '/account',
   ACCOUNT_PROFILE: '/account/profile',
+  ACCOUNT_SETTINGS: '/account/settings',
   ACCOUNT_ORDERS:  '/account/orders',
   ACCOUNT_ORDER:   (orderNumber: string) => `/account/orders/${orderNumber}`,
   ACCOUNT_WISHLIST: '/account/wishlist',

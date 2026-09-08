@@ -275,12 +275,12 @@ export function StoreReviewsClient({
   // ── Reviews ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="grid gap-8 md:grid-cols-[210px_minmax(0,1fr)]">
       {/* Rating overview */}
-      <div className="bg-surface border border-border rounded-card p-6">
-        <div className="flex items-start gap-8 flex-wrap">
+      <div className="md:pr-4">
+        <div className="space-y-6">
           {/* Big score */}
-          <div className="text-center min-w-[80px]">
+          <div className="text-left min-w-[80px]">
             <p className="font-display text-5xl font-bold text-secondary leading-none mb-2">
               {avg.toFixed(1)}
             </p>
@@ -291,7 +291,7 @@ export function StoreReviewsClient({
           </div>
 
           {/* Distribution bars */}
-          <div className="flex-1 min-w-[200px] space-y-1">
+          <div className="min-w-[200px] space-y-1">
             {[5, 4, 3, 2, 1].map((star) => (
               <RatingBar
                 key={star}

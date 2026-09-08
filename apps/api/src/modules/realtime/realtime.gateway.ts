@@ -27,6 +27,7 @@ import {
   isWildcardOrigin,
 } from '../../common/utils/allowed-origins.util';
 import { PresenceService } from './presence.service';
+import { validateSession } from '../auth/validate-session';
 
 /** What a verified handshake leaves on the socket. */
 interface SocketUser {
@@ -77,6 +78,8 @@ export class RealtimeGateway
   /** userId -> socket ids held by THIS instance, for the TTL refresh timer. */
   private readonly local = new Map<string, Set<string>>();
   private refreshTimer?: ReturnType<typeof setInterval>;
+  private readonly connectedSockets = new Map<string, Socket>();
+  private checkingSessions = false;
 
   constructor(
     private readonly jwt:      JwtService,
@@ -85,7 +88,10 @@ export class RealtimeGateway
     private readonly presence: PresenceService,
   ) {
     this.refreshTimer = setInterval(
-      () => { void this.presence.refresh(this.local.keys()); },
+      () => {
+        void this.presence.refresh(this.local.keys());
+        void this.checkConnectedSessions();
+      },
       PRESENCE_REFRESH_SECONDS * 1_000,
     );
     // Node keeps the event loop alive for a pending interval; without this the
@@ -122,6 +128,16 @@ export class RealtimeGateway
           return;
         }
         socket.data['user'] = user;
+        socket.use((_packet, next) => {
+          void this.verify(socket).then((verified) => {
+            if (!verified) {
+              socket.disconnect(true);
+              next(new Error('unauthorized'));
+              return;
+            }
+            next();
+          });
+        });
         next();
       }).catch((e: Error) => next(e));
     });
@@ -136,6 +152,7 @@ export class RealtimeGateway
       socket.disconnect(true);
       return;
     }
+    this.connectedSockets.set(socket.id, socket);
 
     // Their own room, so anything addressed to a person reaches every tab they
     // have open without the sender knowing about sockets.
@@ -150,6 +167,7 @@ export class RealtimeGateway
   }
 
   async handleDisconnect(socket: Socket): Promise<void> {
+    this.connectedSockets.delete(socket.id);
     const user = socket.data['user'] as SocketUser | undefined;
     if (!user) return;
 
@@ -413,11 +431,25 @@ export class RealtimeGateway
     }
 
     try {
-      const payload = await this.jwt.verifyAsync<{ sub: string; role: string }>(token, { secret });
+      const payload = await this.jwt.verifyAsync<{ sub: string; role: string; sid?: string; iat?: number }>(token, { secret });
       if (!payload?.sub) return null;
+      await validateSession(this.prisma, payload);
       return { userId: payload.sub, role: payload.role };
     } catch {
       return null;
+    }
+  }
+
+  /** Also close idle sockets after revocation; they must not keep receiving private messages. */
+  private async checkConnectedSessions(): Promise<void> {
+    if (this.checkingSessions) return;
+    this.checkingSessions = true;
+    try {
+      for (const socket of this.connectedSockets.values()) {
+        if (!await this.verify(socket)) socket.disconnect(true);
+      }
+    } finally {
+      this.checkingSessions = false;
     }
   }
 

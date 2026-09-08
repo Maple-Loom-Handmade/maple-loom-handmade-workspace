@@ -237,7 +237,8 @@
     "addressBook": "Address Book",
     "profilePassword": "Profile & Password",
     "myOffers": "My Offers",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "settings": "Account settings"
   },
   "offers": {
     "title": "My Offers",
@@ -345,5 +346,48 @@
     "nothingSavedHint": "Heart products you love and find them here later.",
     "exploreGifts": "Explore Gifts",
     "savedItems": "{count, plural, one {saved item} other {saved items}}"
+  },
+  "settings": {
+    "title": "Account settings",
+    "back": "Back to your account",
+    "profile": "Profile & security",
+    "addresses": "Addresses",
+    "notifications": "Notifications",
+    "securityTitle": "Keep your account secure",
+    "securityHint": "Manage your password and account details from your profile. EziHubb will never ask for your password or full payment details in a message.",
+    "securityNote": "SMS security alerts are not available yet.",
+    "manageSecurity": "Manage account",
+    "browserTitle": "Browser notifications",
+    "browserNote": "This controls delivery to your registered devices. Your browser must also allow notifications; saving this setting does not grant browser permission.",
+    "emailTitle": "Email notification settings for {email}",
+    "emailWhen": "Email me when…",
+    "essentialNote": "Order confirmations, payment and delivery updates, password resets, and other essential account emails are always sent. These settings do not hide messages or notifications in your account.",
+    "subscriptionsTitle": "Offers & shopping reminders",
+    "subscriptionsHint": "Choose whether to receive optional shopping emails. You can change your choice at any time.",
+    "pushEnabled": {
+      "label": "Receive browser notifications",
+      "hint": "Get notifications about messages and order updates on devices where you enabled them."
+    },
+    "emailMessages": {
+      "label": "Someone sends me a message",
+      "hint": "Receive an email when a shop replies to you."
+    },
+    "emailReviewReminders": {
+      "label": "It’s time to review my purchase",
+      "hint": "Get a reminder to share your experience after your order arrives."
+    },
+    "emailOffers": {
+      "label": "Coupons, offers and cart reminders",
+      "hint": "Receive personalised shop offers and reminders about items left in your cart. Replies to offers you submit will still be sent if this is off."
+    },
+    "save": "Save settings",
+    "saving": "Saving…",
+    "saved": "Your settings have been saved.",
+    "unsaved": "You have unsaved changes.",
+    "saveError": "We couldn’t save your settings. Your changes are still here — please try again.",
+    "loadError": "We couldn’t load your settings.",
+    "retry": "Try again",
+    "loading": "Loading settings",
+    "leaveWarning": "You have unsaved settings. Leave without saving?"
   }
 }

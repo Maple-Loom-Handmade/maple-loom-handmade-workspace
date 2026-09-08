@@ -135,6 +135,7 @@ export class TargetedOffersService {
         template: 'targeted-offer',
         subject:  `${copy.headline} — a gift from ${store.name}`,
         data: {
+          isMarketing:   true,
           storeName:     store.name,
           firstName:     user.firstName ?? 'there',
           headline:      copy.headline,

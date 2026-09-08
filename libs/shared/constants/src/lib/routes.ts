@@ -4,6 +4,9 @@ export const API_ROUTES = {
     LOGIN:           '/auth/login',
     LOGOUT:          '/auth/logout',
     LOGOUT_ALL:      '/auth/logout-all',
+    SESSIONS:        '/auth/sessions',
+    SESSION:         (id: string) => `/auth/sessions/${encodeURIComponent(id)}`,
+    SESSION_CURRENT: '/auth/sessions/current',
     REFRESH:         '/auth/refresh',
     FORGOT_PASSWORD: '/auth/forgot-password',
     RESET_PASSWORD:  '/auth/reset-password',
@@ -21,6 +24,7 @@ export const API_ROUTES = {
 
   USERS: {
     ME:              '/users/me',
+    NOTIFICATION_PREFERENCES: '/users/me/notification-preferences',
     AVATAR:          '/users/me/avatar',
     PASSWORD:        '/users/me/password',
     ADDRESSES:       '/users/me/addresses',

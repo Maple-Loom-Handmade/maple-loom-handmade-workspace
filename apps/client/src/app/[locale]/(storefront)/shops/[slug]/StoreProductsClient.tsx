@@ -306,7 +306,7 @@ export function StoreProductsClient({
         : { storeSlug, isFeatured: true, isActive: true, limit: 4, sort: 'featured' },
     }),
     staleTime: 60_000,
-    enabled:   !hasFilter,
+    enabled:   !hasFilter && featuredLayout !== 'none',
   });
 
   // All items query
@@ -376,7 +376,7 @@ export function StoreProductsClient({
       <div className="flex-1 min-w-0 space-y-10">
 
         {/* ── Featured Items (only shown when no filter active) ─────────── */}
-        {!hasFilter && (
+        {!hasFilter && featuredLayout !== 'none' && (featuredLoading || featured.length > 0) && (
           <section>
             <h2 className="font-display text-xl font-bold text-secondary mb-5">{t('products.featuredItems')}</h2>
             {featuredLoading ? (

@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { signOut } from 'next-auth/react';
-import { Loader2, LogOut, KeyRound } from 'lucide-react';
+import { Loader2, KeyRound } from 'lucide-react';
 import { API_ROUTES } from '@ezihubb/constants';
 import { api } from '../../../lib/api-client';
 import { toast } from '../../../lib/store/toast.store';
-import { useDialog } from '../../../contexts/DialogContext';
+import { SignInHistory } from '../../../components/account/SignInHistory';
 import { AdminPageHeader } from '../../../components/layout/AdminPageHeader';
 
 /** Matches the API's own rule, so the form fails before the request does. */
@@ -23,7 +23,6 @@ const MIN_PASSWORD = 8;
  * whatever they happen to be looking at.
  */
 export default function AccountPage() {
-  const dialog = useDialog();
 
   // hasPassword, because a Google-only account has never had one and asking it
   // to prove the current password would be asking for something that does not
@@ -56,13 +55,6 @@ export default function AccountPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const signOutEverywhere = useMutation({
-    mutationFn: () => api.post<{ revoked: number }>(API_ROUTES.AUTH.LOGOUT_ALL),
-    onSuccess: async () => {
-      await signOut({ callbackUrl: '/login' });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const tooShort = next.length > 0 && next.length < MIN_PASSWORD;
   const mismatch = confirm.length > 0 && confirm !== next;
@@ -76,11 +68,11 @@ export default function AccountPage() {
     'w-full rounded-button border border-border bg-surface px-3 py-2 text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="w-full max-w-[1400px] space-y-6">
       <AdminPageHeader title="Account" subtitle={me?.email ?? ''} />
 
       {/* Password */}
-      <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-6">
+      <section className="max-w-xl rounded-card border border-border bg-surface p-4 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-secondary">
           <KeyRound className="h-4 w-4" aria-hidden="true" />
           {hasPassword ? 'Change password' : 'Set a password'}
@@ -138,12 +130,9 @@ export default function AccountPage() {
           </label>
         </div>
 
-        {/* Said before the button is pressed, not after: this tab is signed
-            out the moment it succeeds, and someone mid-shift should know that
-            in advance. It does NOT say "every device" — see the note in the
-            section below for why that would not be true here. */}
+
         <p className="mt-3 text-xs text-muted">
-          You will be signed out of this tab and asked to sign in again.
+          All sessions will be signed out. You will be asked to sign in again.
         </p>
 
         <button
@@ -157,54 +146,7 @@ export default function AccountPage() {
         </button>
       </section>
 
-      {/* Sessions */}
-      <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-6">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-secondary">
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          Sign out everywhere
-        </h2>
-        <p className="mt-1 text-xs text-muted">
-          Revokes the stored sessions on this account and signs this tab out.
-        </p>
-        {/*
-          Deliberately not called an immediate lockout, because for this app it
-          is not one.
-
-          What this revokes is the account's refresh tokens. The storefront
-          uses them, so a shopper session on this account really does end. The
-          seller hub does not: it holds a NextAuth cookie carrying an API
-          access token, never calls /auth/refresh, and so has nothing here to
-          revoke. Another seller-hub device stays usable until its own cookie
-          expires — up to 24 hours — and changing the password does not shorten
-          that either, for exactly the same reason.
-
-          Closing that gap needs a watermark on the user that the session
-          callback checks, which costs a database read per check and is a
-          decision with a price rather than a line to slip in here. Until then
-          the text says what actually happens.
-        */}
-        <p className="mt-2 text-xs text-muted">
-          Another seller-hub device that is already signed in is not locked out
-          straight away — it stays usable until its session expires, up to 24
-          hours. If a device is lost, treat that as the window.
-        </p>
-
-        <button
-          type="button"
-          disabled={signOutEverywhere.isPending}
-          onClick={async () => {
-            const ok = await dialog.confirm(
-              'Every device signed in to this account will be signed out, including this one.',
-              { title: 'Sign out everywhere', destructive: true },
-            );
-            if (ok) signOutEverywhere.mutate();
-          }}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-error px-5 py-2 text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:opacity-50"
-        >
-          {signOutEverywhere.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          Sign out everywhere
-        </button>
-      </section>
+      <SignInHistory />
     </div>
   );
 }

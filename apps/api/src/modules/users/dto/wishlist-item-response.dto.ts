@@ -7,5 +7,6 @@ export class WishlistItemResponseDto {
   @ApiProperty() productSlug: string;
   @ApiPropertyOptional() productImageUrl: string | null;
   @ApiProperty() productBasePrice: number;
+  @ApiProperty() productIsActive: boolean;
   @ApiProperty() addedAt: Date;
 }

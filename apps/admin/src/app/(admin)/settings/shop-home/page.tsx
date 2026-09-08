@@ -68,6 +68,15 @@ interface TaxInfoLite { sellerType: 'INDIVIDUAL' | 'BUSINESS' }
 // field this page needs (hasPlus) is used, kept minimal on purpose.
 interface SellerSubscriptionLite { hasPlus: boolean }
 
+interface StoreImageUploadResponse {
+  bannerUrl?: string;
+  logoUrl?: string;
+}
+
+const STORE_BANNER_MAX_BYTES = 10 * 1024 * 1024;
+const STORE_BANNER_ACCEPT = 'image/jpeg,image/png,image/webp';
+const STORE_BANNER_TYPES = new Set(STORE_BANNER_ACCEPT.split(','));
+
 const SOCIAL_PLATFORMS = [
   { value: 'facebook',  label: 'Facebook'  },
   { value: 'instagram', label: 'Instagram' },
@@ -141,6 +150,7 @@ export default function ShopHomeEditorPage() {
   const { alert, confirm } = useDialog();
 
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [bannerUploadProgress, setBannerUploadProgress] = useState<number | null>(null);
   const [uploadingLogo,   setUploadingLogo]   = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [taglineModalOpen,  setTaglineModalOpen]  = useState(false);
@@ -275,17 +285,35 @@ export default function ShopHomeEditorPage() {
     file: File,
     endpoint: string,
     setLoading: (v: boolean) => void,
-  ): Promise<boolean> => {
+    onProgress?: (progress: number) => void,
+  ): Promise<StoreImageUploadResponse | null> => {
     setLoading(true);
     try {
       const form = new FormData();
       form.append('file', file);
-      await adminApi.post(endpoint, form);
-      invalidateStore();
-      return true;
-    } catch {
-      await alert('Upload failed. Please try again.', { variant: 'error' });
-      return false;
+      const result = await api.post<StoreImageUploadResponse>(endpoint, form, {
+        onUploadProgress: (event) => {
+          if (!event.total || !onProgress) return;
+          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        },
+      });
+
+      // Apply the canonical URL from the successful POST immediately. The old
+      // flow discarded it and depended on a second GET, so a slow refetch made
+      // the saved image appear only after a manual page reload.
+      qc.setQueryData<ShopHomeStore>(['shop-home', ownStoreId], (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          ...(result.bannerUrl ? { bannerUrl: result.bannerUrl } : {}),
+          ...(result.logoUrl ? { logoUrl: result.logoUrl } : {}),
+        };
+      });
+      void invalidateStore();
+      return result;
+    } catch (err) {
+      await alert((err as Error).message || 'Upload failed. Please try again.', { variant: 'error' });
+      return null;
     } finally {
       setLoading(false);
     }
@@ -308,14 +336,36 @@ export default function ShopHomeEditorPage() {
 
   const saveBannerPreview = async () => {
     if (!bannerPreview) return;
-    const ok = await handleUpload(bannerPreview.file, API_ROUTES.ADMIN.STORE_BANNER(ownStoreId), setUploadingBanner);
+    setBannerUploadProgress(0);
+    const result = await handleUpload(
+      bannerPreview.file,
+      API_ROUTES.ADMIN.STORE_BANNER(ownStoreId),
+      setUploadingBanner,
+      setBannerUploadProgress,
+    );
     // Only discard the local preview once the upload actually succeeded — on
     // failure (already surfaced via the alert in handleUpload) keep it, so
     // the user doesn't lose their selected file and can just retry Save.
-    if (ok) {
+    if (result?.bannerUrl) {
       URL.revokeObjectURL(bannerPreview.url);
       setBannerPreview(null);
     }
+    setBannerUploadProgress(null);
+  };
+
+  const selectBannerFile = (file: File) => {
+    if (!STORE_BANNER_TYPES.has(file.type)) {
+      void alert('Banner must be a JPEG, PNG or WebP image.', { variant: 'error' });
+      return;
+    }
+    if (file.size > STORE_BANNER_MAX_BYTES) {
+      void alert('Banner must be smaller than 10 MB.', { variant: 'error' });
+      return;
+    }
+    setBannerPreview((previous) => {
+      if (previous) URL.revokeObjectURL(previous.url);
+      return { file, url: URL.createObjectURL(file) };
+    });
   };
 
   const cancelBannerPreview = () => {
@@ -524,11 +574,11 @@ export default function ShopHomeEditorPage() {
               </span>
             </div>
           )}
-          <input ref={bannerInputRef} type="file" accept="image/*" className="hidden"
+          <input ref={bannerInputRef} type="file" accept={STORE_BANNER_ACCEPT} className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = '';
-              if (f) setBannerPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return { file: f, url: URL.createObjectURL(f) }; });
+              if (f) selectBannerFile(f);
             }} />
         </div>
 
@@ -538,7 +588,11 @@ export default function ShopHomeEditorPage() {
             <div className="flex gap-2">
               <button type="button" onClick={cancelBannerPreview} disabled={uploadingBanner} className="px-4 py-2 border border-border text-secondary text-sm font-semibold rounded-pill disabled:opacity-50">Cancel</button>
               <button type="button" onClick={saveBannerPreview} disabled={uploadingBanner} className="px-4 py-2 bg-secondary hover:bg-secondary/90 text-white text-sm font-semibold rounded-pill disabled:opacity-50">
-                {uploadingBanner ? 'Saving…' : 'Save'}
+                {uploadingBanner
+                  ? bannerUploadProgress === 100
+                    ? 'Finishing...'
+                    : `Uploading ${bannerUploadProgress ?? 0}%`
+                  : 'Save'}
               </button>
             </div>
           </div>
@@ -697,7 +751,10 @@ export default function ShopHomeEditorPage() {
             {/* Seed the radio from what's actually stored, so reopening the
                 modal doesn't silently show 'standard' for a store already on
                 the mixed layout (and then save that back on Done). */}
-            <button type="button" onClick={() => { setFeaturedLayout(store.featuredLayout === 'mixed' ? 'mixed' : 'standard'); setLayoutModalOpen(true); }}
+            <button type="button" onClick={() => {
+              setFeaturedLayout(store.featuredLayout === 'mixed' ? 'mixed' : store.featuredLayout === 'none' ? 'none' : 'standard');
+              setLayoutModalOpen(true);
+            }}
               className="w-full flex items-center justify-center gap-1.5 py-3 border border-border rounded-lg text-sm font-medium text-secondary hover:border-secondary/40 transition-colors">
               {store.featuredProductIds.length > 0
                 ? <><LayoutGrid className="w-4 h-4" /> Change layout</>
@@ -1310,7 +1367,7 @@ export default function ShopHomeEditorPage() {
             onClick={async () => {
               setLayoutModalOpen(false);
               if (featuredLayout === 'none') {
-                await patchStore({ featuredProductIds: [] });
+                await patchStore({ featuredProductIds: [], featuredLayout: 'none' });
                 return;
               }
               // Persist the layout itself before opening the picker. 'mixed'

@@ -9,6 +9,12 @@ import {
   UseFilters,
   HttpCode,
   HttpStatus,
+  Delete,
+  Param,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -40,6 +46,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { AuditLogService } from '../../common/services/audit-log.service';
+import { sessionIp } from './session-ip';
 
 @ApiTags('Auth')
 // Guard at CLASS level, not per-method. Without it nothing populates
@@ -185,6 +192,30 @@ export class AuthController {
     return result;
   }
 
+  @Get('sessions')
+  @ApiBearerAuth('access-token')
+  async sessions(
+    @CurrentUser() user: JwtPayload,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ) {
+    if (page < 1 || page > 10000) throw new BadRequestException('Invalid page');
+    return this.authService.listSessions(user.sub, user.sid, page);
+  }
+
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  async revokeSession(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await this.authService.revokeSession(user.sub, id);
+  }
+
+  @Post('sessions/current')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  async recordSessionDevice(@CurrentUser() user: JwtPayload, @Req() req: Request) {
+    await this.authService.recordSessionDevice(user.sub, user.sid, sessionIp(req), req.headers['user-agent']);
+  }
+
   // POST /auth/logout
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -196,7 +227,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     const refreshToken: string | undefined = req.cookies?.['refresh_token'];
-    if (refreshToken) {
+    if (user.sid) {
+      await this.authService.revokeSession(user.sub, user.sid);
+    } else if (refreshToken) {
       await this.authService.logout(user.sub, refreshToken);
     }
     this.authService.clearRefreshTokenCookie(res);

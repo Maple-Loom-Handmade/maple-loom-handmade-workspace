@@ -9,6 +9,7 @@ import { useProfile } from '@ezihubb/api-client';
 import { useSession } from 'next-auth/react';
 import { useAuthStore } from '../../../lib/store/auth.store';
 import { AccountSidebar } from '../../../components/account/AccountSidebar';
+import { SettingsNavigation } from '../../../components/account/SettingsNavigation';
 
 export default function AccountLayoutClient({
   children,
@@ -19,6 +20,7 @@ export default function AccountLayoutClient({
   const locale   = useLocale();
   const router   = useRouter();
   const pathname = usePathname();
+  const isSettings = ['/account/settings', '/account/profile', '/account/addresses'].some((route) => pathname.endsWith(route));
 
   const { status } = useSession();
   // SessionSyncer syncs next-auth token → Zustand after session loads.
@@ -84,14 +86,14 @@ export default function AccountLayoutClient({
         </div>
 
         {/* ── Main 2-col layout ──────────────────────────────────────────── */}
-        <div className="flex gap-6 items-start">
+        <div className={isSettings ? 'mx-auto max-w-[1000px]' : 'flex gap-6 items-start'}>
           {/* Desktop sidebar */}
-          <div className="hidden md:block w-[260px] shrink-0">
+          <div className={isSettings ? 'hidden' : 'hidden md:block w-[260px] shrink-0'}>
             <AccountSidebar profile={profile} />
           </div>
 
           {/* Page content */}
-          <div className="flex-1 min-w-0">{children}</div>
+          <div className="flex-1 min-w-0">{isSettings && <SettingsNavigation />}{children}</div>
         </div>
 
         {/* ── Mobile bottom sheet nav ────────────────────────────────────── */}

@@ -10,7 +10,7 @@ import { Type } from 'class-transformer';
 import { AdminController } from '../../common/decorators/admin-controller.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, FEATURED_LAYOUTS, type FeaturedLayout } from '@ezihubb/constants';
-import { StoresService } from './stores.service';
+import { STORE_BANNER_MAX_BYTES, StoresService } from './stores.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { StoreContextService } from '../../common/services/store-context.service';
 import {
@@ -51,7 +51,7 @@ class AdminUpdateStoreDto {
   @IsOptional() @IsString() @MaxLength(32)
   colorTheme?: string;
 
-  // Restricted to the two known layouts at the DTO layer, so an unknown value
+  // Restricted to the known layouts at the DTO layer, so an unknown value
   // can never reach the column (the DB stores plain TEXT). 'mixed' is
   // additionally Plus-gated in StoresService.adminUpdateStore.
   @IsOptional() @IsIn(FEATURED_LAYOUTS)
@@ -188,7 +188,10 @@ export class AdminStoresController {
   }
 
   @Post(':id/banner')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: STORE_BANNER_MAX_BYTES },
+  }))
   async uploadBanner(
     @Param('id') id: string,
     @Req() req: Request,

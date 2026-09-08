@@ -18,10 +18,21 @@
     "tabReviews": "Đánh giá",
     "tabAbout": "Giới thiệu",
     "searchPlaceholder": "Tìm trong {count} sản phẩm",
+    "shopItems": "Sản phẩm của cửa hàng",
+    "announcement": "Thông báo từ cửa hàng",
+    "announcementUpdated": "Cập nhật lần cuối {date}",
     "about": {
       "title": "Giới thiệu về cửa hàng",
       "totalSales": "Tổng lượt bán",
       "activeListings": "Sản phẩm đang bán",
+      "onPlatformSince": "Trên EziHubb từ",
+      "photosAndVideo": "Không gian cửa hàng",
+      "shopVideo": "Video từ {name}",
+      "shopPhoto": "Ảnh cửa hàng {number} của {name}",
+      "meetTheOwner": "Gặp gỡ chủ cửa hàng",
+      "shopOwner": "Chủ cửa hàng",
+      "followOnline": "Theo dõi cửa hàng",
+      "frequentlyAskedQuestions": "Câu hỏi thường gặp",
       "noDescription": "Cửa hàng chưa cung cấp mô tả."
     }
   },

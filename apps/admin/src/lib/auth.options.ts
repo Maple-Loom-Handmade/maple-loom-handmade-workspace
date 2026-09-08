@@ -55,7 +55,8 @@ export const authOptions: NextAuthOptions = {
         totpCode: { label: 'TOTP Code', type: 'text' },
       },
 
-      async authorize(credentials) {
+      async authorize(credentials, req) {
+        const browserHeaders = { 'User-Agent': String(req.headers?.['user-agent'] ?? '') };
         // ── STEP 2: TOTP code verification ──────────────────────────────────
         if (credentials?.partialToken && credentials?.totpCode) {
           try {
@@ -64,7 +65,7 @@ export const authOptions: NextAuthOptions = {
             }>(`${API_BASE}${API_ROUTES.AUTH.TOTP_VERIFY}`, {
               partialToken: credentials.partialToken,
               code: credentials.totpCode,
-            });
+            }, { headers: browserHeaders });
             const data = envelope.data;
             const user = (data['user'] ?? data) as Record<string, unknown>;
             if (!['ADMIN', 'SUPER_ADMIN'].includes(user['role'] as string))
@@ -103,7 +104,7 @@ export const authOptions: NextAuthOptions = {
           >(
             `${API_BASE}${API_ROUTES.AUTH.LOGIN}`,
             { email: credentials.email, password: credentials.password },
-            { validateStatus: (s) => s < 500 },
+            { validateStatus: (s) => s < 500, headers: browserHeaders },
           );
 
           // Unwrap the { success, data, meta } envelope
@@ -203,6 +204,21 @@ export const authOptions: NextAuthOptions = {
   },
 
   pages: { signIn: '/login', error: '/login' },
+  events: {
+    async signOut({ token }) {
+      if (!token?.['accessToken']) return;
+      try {
+        await axios.post(`${API_BASE}${API_ROUTES.AUTH.LOGOUT}`, undefined, {
+          headers: { Authorization: `Bearer ${token['accessToken']}` }, timeout: 5000,
+        });
+      } catch (error) {
+        // Already revoked/expired sessions need no further action.
+        if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+          console.error('[Admin auth] Could not revoke the API session during sign-out');
+        }
+      }
+    },
+  },
   session: { strategy: 'jwt', maxAge: 24 * 60 * 60 },
 
   // NextAuth fails closed when this server-only secret is absent in

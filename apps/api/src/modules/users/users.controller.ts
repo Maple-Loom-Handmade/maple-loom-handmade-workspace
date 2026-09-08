@@ -27,6 +27,7 @@ import {
 import { Request, Response } from 'express';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { NotificationPreferencesDto } from './dto/notification-preferences.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { UpdateWishlistShareDto } from './dto/update-wishlist-share.dto';
@@ -336,6 +337,16 @@ export class UsersController {
   }
 
   // PATCH /users/me/push-preferences
+  @Get('me/notification-preferences')
+  async notificationPreferences(@CurrentUser() user: JwtPayload) {
+    return this.usersService.getNotificationPreferences(user.sub);
+  }
+
+  @Patch('me/notification-preferences')
+  async saveNotificationPreferences(@CurrentUser() user: JwtPayload, @Body() dto: NotificationPreferencesDto) {
+    return this.usersService.saveNotificationPreferences(user.sub, dto);
+  }
+
   @Patch('me/push-preferences')
   @ApiOperation({ summary: 'Update push notification preference' })
   async updatePushPreferences(

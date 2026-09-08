@@ -160,11 +160,27 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (!res.ok) {
-    const err = body as Partial<ApiRequestError>;
+    const payload = body as {
+      message?: unknown;
+      code?: unknown;
+      errors?: Record<string, string[]>;
+      error?: {
+        message?: unknown;
+        code?: unknown;
+        details?: { field: string; message: string }[];
+      };
+    };
+    const serverError = payload?.error;
     throw new ApiRequestError(
       res.status,
-      typeof err?.message === 'string' ? err.message : `HTTP ${res.status}`,
-      err?.errors,
+      typeof serverError?.message === 'string'
+        ? serverError.message
+        : typeof payload?.message === 'string' ? payload.message : `HTTP ${res.status}`,
+      payload?.errors,
+      typeof serverError?.code === 'string'
+        ? serverError.code
+        : typeof payload?.code === 'string' ? payload.code : undefined,
+      serverError?.details,
     );
   }
 

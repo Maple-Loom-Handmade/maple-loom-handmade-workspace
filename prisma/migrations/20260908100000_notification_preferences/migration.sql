@@ -1,0 +1,4 @@
+ALTER TABLE "User"
+  ADD COLUMN "emailMessages" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "emailReviewReminders" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "emailOffers" BOOLEAN NOT NULL DEFAULT false;

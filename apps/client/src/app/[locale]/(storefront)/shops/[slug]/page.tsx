@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { ShieldCheck, Star, ShoppingBag, Share2 } from 'lucide-react';
+import { MapPin, ShieldCheck, Star, ShoppingBag, Share2 } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { apiClient } from '@ezihubb/api-client';
 import { API_ROUTES, getShopColorTheme } from '@ezihubb/constants';
@@ -35,6 +35,39 @@ interface StorePublicDto {
   featuredProductIds: string[];
   /** Already forced to 'grid' by getStoreBySlug for a store without Plus. */
   featuredLayout: string | null;
+  tagline:        string | null;
+  location:       string | null;
+  announcement:   string | null;
+  announcementUpdatedAt: string | null;
+  aboutHeadline:  string | null;
+  aboutVideoUrl:  string | null;
+  aboutPhotoUrls: string[];
+  ownerBio:       string | null;
+  socialLinks:    unknown;
+  faqs:           { id: string; question: string; answer: string; sortOrder: number }[];
+  owner: {
+    firstName: string | null;
+    lastName:  string | null;
+    avatarUrl: string | null;
+  };
+}
+
+interface StoreSocialLink {
+  platform: string;
+  url: string;
+}
+
+function normalizeSocialLinks(value: unknown): StoreSocialLink[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((link): link is StoreSocialLink => {
+    if (!link || typeof link !== 'object') return false;
+    const candidate = link as Record<string, unknown>;
+    return typeof candidate.platform === 'string'
+      && candidate.platform.trim().length > 0
+      && typeof candidate.url === 'string'
+      && /^https?:\/\//i.test(candidate.url);
+  });
 }
 
 export async function generateMetadata({
@@ -52,10 +85,11 @@ export async function generateMetadata({
 
   return {
     title:       store.name,
-    description: store.description?.slice(0, 160) ?? t('storePage.metaDescriptionFallback', { name: store.name }),
+    description: (store.description ?? store.aboutHeadline ?? store.tagline)?.slice(0, 160)
+      ?? t('storePage.metaDescriptionFallback', { name: store.name }),
     openGraph: {
       title:       store.name,
-      description: store.description?.slice(0, 160),
+      description: (store.description ?? store.aboutHeadline ?? store.tagline)?.slice(0, 160),
       images:      store.bannerUrl ? [store.bannerUrl] : [],
       url:         `/shops/${slug}`,
     },
@@ -69,7 +103,7 @@ export const dynamic = 'force-dynamic';
 
 async function ShareButtons({ name, slug, locale }: { name: string; slug: string; locale: string }) {
   const t = await getTranslations({ locale, namespace: 'shops' });
-  const url     = `https://ezihubb.com/shops/${slug}`;
+  const url     = `https://ezihubb.com/${locale}/shops/${slug}`;
   const encoded = encodeURIComponent(url);
   const text    = encodeURIComponent(t('storePage.shareCheckOut', { name }));
 
@@ -132,35 +166,37 @@ export default async function StorePublicPage({
           banner image — a real bannerUrl always renders on top and this is
           never visible, so tinting it with the theme color is purely
           decorative (no text sits on it, no contrast concern). */}
-      <div className="relative h-44 md:h-64 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5"
-          style={theme ? { background: `linear-gradient(to bottom right, ${theme.hex}33, ${theme.hex}0D)` } : undefined}
-        />
-        {store.bannerUrl && (
-          <Image
-            src={store.bannerUrl}
-            alt={t('storePage.bannerAlt', { name: store.name })}
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
+      <div className="max-w-[1280px] mx-auto px-3 sm:px-4 md:px-8 pt-4 md:pt-7">
+        <div className="relative aspect-[3/1] md:aspect-[4/1] min-h-36 max-h-80 overflow-hidden rounded-2xl bg-surface border border-border shadow-sm">
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5"
+            style={theme ? { background: `linear-gradient(135deg, ${theme.hex}40, ${theme.hex}12)` } : undefined}
           />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+          {store.bannerUrl && (
+            <Image
+              src={store.bannerUrl}
+              alt={t('storePage.bannerAlt', { name: store.name })}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 1280px) 100vw, 1280px"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-black/5" />
+        </div>
       </div>
 
-      <div className="max-w-[1200px] mx-auto px-4 md:px-8">
+      <div className="max-w-[1280px] mx-auto px-4 md:px-8">
         {/* ── Store header ──────────────────────────────────────────────────────── */}
-        <div className="relative -mt-12 md:-mt-16 mb-5 flex items-end gap-4 md:gap-5">
+        <div className="relative flex flex-col gap-4 border-b border-border py-5 md:flex-row md:items-center md:gap-5 md:py-6">
           {/* Logo */}
-          <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl border-4 border-surface bg-surface overflow-hidden shadow-lg shrink-0">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-surface md:h-20 md:w-20">
             {store.logoUrl ? (
               <Image
                 src={store.logoUrl}
                 alt={t('storePage.logoAlt', { name: store.name })}
-                width={112}
-                height={112}
+                width={80}
+                height={80}
                 className="object-cover w-full h-full"
               />
             ) : (
@@ -173,9 +209,9 @@ export default async function StorePublicPage({
           </div>
 
           {/* Name + stats */}
-          <div className="flex-1 min-w-0 pb-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-2xl md:text-3xl font-bold text-secondary">
+              <h1 className="font-display text-2xl md:text-[28px] leading-tight font-bold text-secondary">
                 {store.name}
               </h1>
               {store.verifiedAt && (
@@ -184,6 +220,17 @@ export default async function StorePublicPage({
                 </span>
               )}
             </div>
+            {store.tagline && (
+              <p className="mt-1 text-sm md:text-base text-secondary/80 leading-relaxed">
+                {store.tagline}
+              </p>
+            )}
+            {store.location && (
+              <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted">
+                <MapPin className="w-3.5 h-3.5" aria-hidden />
+                {store.location}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-muted">
               {rating > 0 && (
                 <span className="flex items-center gap-1">
@@ -202,19 +249,14 @@ export default async function StorePublicPage({
           </div>
 
           {/* Follow + Share — desktop only */}
-          <div className="hidden md:flex items-center gap-3 pb-1 shrink-0">
+          <div className="hidden md:flex flex-col items-end gap-3 shrink-0">
             <FollowShopButton slug={store.slug} initialFollowerCount={store.followerCount} theme={theme} />
             <ShareButtons name={store.name} slug={store.slug} locale={locale} />
           </div>
         </div>
 
-        {/* Description + mobile follow/share */}
-        <div className="flex flex-col md:flex-row md:items-start gap-3 mb-0">
-          {store.description && (
-            <p className="flex-1 min-w-0 text-sm text-secondary/80 leading-relaxed line-clamp-3 md:line-clamp-none">
-              {store.description}
-            </p>
-          )}
+        {/* Mobile follow/share */}
+        <div className="mb-0">
           <div className="md:hidden flex items-center gap-3">
             <FollowShopButton slug={store.slug} initialFollowerCount={store.followerCount} theme={theme} />
             <ShareButtons name={store.name} slug={store.slug} locale={locale} />
@@ -238,6 +280,16 @@ export default async function StorePublicPage({
           rating,
           totalProducts: store.totalProducts,
           totalOrders:   store.totalOrders,
+          createdAt:     store.createdAt,
+          announcement: store.announcement,
+          announcementUpdatedAt: store.announcementUpdatedAt,
+          aboutHeadline: store.aboutHeadline,
+          aboutVideoUrl: store.aboutVideoUrl,
+          aboutPhotoUrls: store.aboutPhotoUrls ?? [],
+          ownerBio:      store.ownerBio,
+          socialLinks:   normalizeSocialLinks(store.socialLinks),
+          faqs:          store.faqs ?? [],
+          owner:         store.owner,
           // Never gated — featuredProductIds is a FREE feature; only
           // colorTheme (and, below, featuredLayout) are Plus-gated.
           featuredProductIds: store.featuredProductIds ?? [],

@@ -1,5 +1,5 @@
 import { StoresService } from './stores.service';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { EntitlementsService } from '../subscriptions/entitlements.service';
 import {
@@ -54,14 +54,41 @@ describe('StoresService.adminGetStore — Decimal response normalization', () =>
 function makeService(prisma: ReturnType<typeof makePrismaMock>, canUseFeature: jest.Mock) {
   return new StoresService(
     prisma as unknown as PrismaService,
-    {} as any, // emailQueue — unused by the two methods under test
-    {} as any, // storageService
-    {} as any, // redis — unused as long as tests don't pass a viewLockId
-    {} as any, // analyticsService
+    {} as ConstructorParameters<typeof StoresService>[1], // emailQueue
+    {} as ConstructorParameters<typeof StoresService>[2], // storageService
+    {} as ConstructorParameters<typeof StoresService>[3], // redis
+    {} as ConstructorParameters<typeof StoresService>[4], // analyticsService
     { canUseFeature } as unknown as EntitlementsService,
     undefined, // moderationService — optional, unused unless bannerUrl/logoUrl is set
   );
 }
+
+describe('StoresService.adminUploadStoreBanner — validation', () => {
+  it('rejects files larger than 10 MB before loading them into image processing', async () => {
+    const service = makeService(makePrismaMock(), jest.fn());
+    const file = {
+      size: 10 * 1024 * 1024 + 1,
+      mimetype: 'image/png',
+    } as Express.Multer.File;
+
+    await expect(service.adminUploadStoreBanner('store_1', file)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.adminUploadStoreBanner('store_1', file)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'ERR_FILE_TOO_LARGE' }),
+    });
+  });
+
+  it('rejects image formats that the storefront cannot render consistently', async () => {
+    const service = makeService(makePrismaMock(), jest.fn());
+    const file = {
+      size: 1024,
+      mimetype: 'image/svg+xml',
+    } as Express.Multer.File;
+
+    await expect(service.adminUploadStoreBanner('store_1', file)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'ERR_FILE_TYPE_INVALID' }),
+    });
+  });
+});
 
 describe('StoresService.adminUpdateStore — Plus gate on colorTheme', () => {
   it('rejects with 403 ERR_PLUS_REQUIRED when setting colorTheme without an active Plus subscription', async () => {
@@ -104,6 +131,37 @@ describe('StoresService.adminUpdateStore — Plus gate on colorTheme', () => {
 });
 
 describe('StoresService.getStoreBySlug — Plus gate on colorTheme only, featuredProductIds always free', () => {
+  it('selects the public Shop Home customizations without exposing owner credentials', async () => {
+    const prisma = makePrismaMock();
+    (prisma.store as any).findUnique.mockResolvedValue({
+      id: 'store_1', slug: 'my-shop', name: 'My Shop', description: null,
+      logoUrl: null, bannerUrl: null, status: 'ACTIVE',
+      totalOrders: 0, rating: 0, createdAt: new Date(), verifiedAt: null,
+      shareSaveEnabled: false, colorTheme: null, featuredProductIds: [],
+      subscription: null,
+      _count: { products: 0, followers: 0 },
+    });
+    const service = makeService(prisma, jest.fn());
+
+    await service.getStoreBySlug('my-shop');
+
+    const select = (prisma.store as any).findUnique.mock.calls[0][0].select;
+    expect(select).toEqual(expect.objectContaining({
+      tagline: true,
+      location: true,
+      announcement: true,
+      aboutHeadline: true,
+      aboutVideoUrl: true,
+      aboutPhotoUrls: true,
+      ownerBio: true,
+      socialLinks: true,
+      faqs: expect.any(Object),
+      owner: { select: { firstName: true, lastName: true, avatarUrl: true } },
+    }));
+    expect(select.owner.select).not.toHaveProperty('email');
+    expect(select.owner.select).not.toHaveProperty('passwordHash');
+  });
+
   it('nulls out colorTheme but returns featuredProductIds unchanged when the store has no Plus', async () => {
     const prisma = makePrismaMock();
     (prisma.store as any).findUnique.mockResolvedValue({
@@ -122,6 +180,26 @@ describe('StoresService.getStoreBySlug — Plus gate on colorTheme only, feature
 
     expect(result.colorTheme).toBeNull();
     expect(result.featuredProductIds).toEqual(['p1', 'p2', 'p3']); // NOT gated — the exact bug that was caught in review
+  });
+
+  it('preserves the free featured-area opt-out when the store has no Plus', async () => {
+    const prisma = makePrismaMock();
+    (prisma.store as any).findUnique.mockResolvedValue({
+      id: 'store_1', slug: 'my-shop', name: 'My Shop', description: null,
+      logoUrl: null, bannerUrl: null, status: 'ACTIVE',
+      totalOrders: 0, rating: 0, createdAt: new Date(), verifiedAt: null,
+      shareSaveEnabled: false,
+      colorTheme: null,
+      featuredProductIds: [],
+      featuredLayout: 'none',
+      subscription: null,
+      _count: { products: 0, followers: 0 },
+    });
+    const service = makeService(prisma, jest.fn());
+
+    const result = await service.getStoreBySlug('my-shop');
+
+    expect(result.featuredLayout).toBe('none');
   });
 
   it('returns colorTheme unchanged when the store has an active Plus subscription', async () => {

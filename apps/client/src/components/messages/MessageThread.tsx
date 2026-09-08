@@ -522,10 +522,9 @@ export function MessageThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv?.messages]);
 
-  // The shop page, in the buyer's own locale. Falls back to the shops index
-  // when a conversation predates the store link rather than rendering a link
-  // to /shops/undefined.
-  const shopHref = conv?.store?.slug ? `/${locale}/shops/${conv.store.slug}` : `/${locale}/shops`;
+  // There is no /shops index route. Conversations that predate the store link
+  // fall back to search so Next.js prefetch does not emit a background 404.
+  const shopHref = conv?.store?.slug ? `/${locale}/shops/${conv.store.slug}` : `/${locale}/search`;
   const shopName = conv?.store?.name ?? 'Shop';
 
   // Presence is per user, and a shop is online when its owner is. The server

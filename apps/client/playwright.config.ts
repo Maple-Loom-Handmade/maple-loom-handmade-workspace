@@ -36,6 +36,8 @@ export default defineConfig({
     env: {
       ...process.env,
       NEXT_PUBLIC_API_URL: 'https://api.ezihubb.test',
+      NEXTAUTH_URL: 'http://127.0.0.1:3000',
+      NEXTAUTH_SECRET: 'playwright-local-only-not-a-production-secret',
     },
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: true,

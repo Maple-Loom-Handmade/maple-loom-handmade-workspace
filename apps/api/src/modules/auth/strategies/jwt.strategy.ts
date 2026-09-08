@@ -3,11 +3,13 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { validateSession } from '../validate-session';
 
 export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  sid?: string;
   iat?: number;
   exp?: number;
 }
@@ -40,14 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       });
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, deletedAt: true },
-    });
-
-    if (!user || user.deletedAt) {
-      throw new UnauthorizedException({ code: 'ERR_UNAUTHORIZED' });
-    }
+    await validateSession(this.prisma, payload);
 
     return payload;
   }

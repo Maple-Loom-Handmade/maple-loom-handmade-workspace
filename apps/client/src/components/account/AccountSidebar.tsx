@@ -12,6 +12,7 @@ import {
   LogOut,
   MessageCircle,
   HandCoins,
+  Settings,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, queryKeys } from '@ezihubb/api-client';
@@ -67,6 +68,7 @@ export function AccountSidebar({ profile, onNavigate }: AccountSidebarProps) {
     { href: CLIENT_ROUTES.ACCOUNT_OFFERS,    icon: HandCoins,     label: t('myOffers'),         badge: undefined    },
     { href: CLIENT_ROUTES.ACCOUNT_ADDRESSES, icon: MapPin,        label: t('addressBook'),      badge: undefined    },
     { href: CLIENT_ROUTES.ACCOUNT_PROFILE,   icon: User,          label: t('profilePassword'),  badge: undefined    },
+    { href: CLIENT_ROUTES.ACCOUNT_SETTINGS,  icon: Settings,      label: t('settings'),         badge: undefined    },
   ] as const;
 
   return (

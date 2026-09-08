@@ -4,6 +4,7 @@ import { headers, cookies } from 'next/headers';
 import { authOptions } from '../../lib/auth.options';
 import { AdminSidebar, AdminMobileNav } from '../../components/layout/AdminSidebar';
 import { TabTitleBadge } from '../../components/layout/TabTitleBadge';
+import { AdminSessionMonitor } from '../../components/providers/AdminSessionMonitor';
 // import { GetHelpButton } from '../../components/layout/GetHelpButton'; // temporarily unmounted — see below
 import { resolveInStoreMode, STORE_CONTEXT_COOKIE } from '../../lib/store-context-shared';
 import { ServerStoreModeProvider } from '../../lib/server-store-mode';
@@ -45,6 +46,7 @@ export default async function AdminLayout({
     // than recomputing it from the cookie. One answer, decided where the page
     // content was decided, so the two halves cannot contradict each other.
     <ServerStoreModeProvider inStoreMode={inStoreMode}>
+    <AdminSessionMonitor />
     {/* Keep the shell attached to the viewport on every route. A shared App
         Router layout survives client-side navigation, so deriving this class
         from the pathname captured on its first render left /messages in the

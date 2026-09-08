@@ -11,5 +11,5 @@ export enum PlusFeature {
 }
 
 /** The two layouts `Store.featuredLayout` accepts. 'mixed' requires Plus. */
-export const FEATURED_LAYOUTS = ['grid', 'mixed'] as const;
+export const FEATURED_LAYOUTS = ['grid', 'mixed', 'none'] as const;
 export type FeaturedLayout = (typeof FEATURED_LAYOUTS)[number];

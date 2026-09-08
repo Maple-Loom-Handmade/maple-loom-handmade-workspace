@@ -18,10 +18,21 @@
     "tabReviews": "评价",
     "tabAbout": "关于",
     "searchPlaceholder": "在全部 {count} 件商品中搜索",
+    "shopItems": "店铺商品",
+    "announcement": "店铺公告",
+    "announcementUpdated": "最后更新于 {date}",
     "about": {
       "title": "关于本店",
       "totalSales": "总销量",
       "activeListings": "在售商品",
+      "onPlatformSince": "入驻 EziHubb",
+      "photosAndVideo": "店铺风采",
+      "shopVideo": "来自 {name} 的视频",
+      "shopPhoto": "{name} 店铺照片 {number}",
+      "meetTheOwner": "认识店主",
+      "shopOwner": "店主",
+      "followOnline": "关注本店",
+      "frequentlyAskedQuestions": "常见问题",
       "noDescription": "该店铺暂未提供简介。"
     }
   },

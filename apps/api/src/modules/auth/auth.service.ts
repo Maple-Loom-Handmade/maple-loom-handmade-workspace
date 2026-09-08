@@ -4,6 +4,7 @@
   UnauthorizedException,
   ConflictException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -82,7 +83,7 @@ export class AuthService {
       this.logger.error(`Failed to enqueue verification email: ${err.message}`),
     );
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId, undefined, res.req?.headers['user-agent']);
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return {
@@ -153,7 +154,7 @@ export class AuthService {
       return { requiresTOTP: true, partialToken };
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, dto.rememberMe, user.storeId);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, dto.rememberMe, user.storeId, undefined, res.req?.headers['user-agent']);
     this.setRefreshTokenCookie(res, tokens.refreshToken, dto.rememberMe);
 
     return {
@@ -212,7 +213,7 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'ERR_TOTP_CODE_INVALID', message: 'Invalid authentication code' });
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId, undefined, res.req?.headers['user-agent']);
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return {
@@ -281,35 +282,64 @@ export class AuthService {
 
   // ─── Logout ────────────────────────────────────────────────────────────────
 
-  /**
-   * Signs the account out of every device, this one included.
-   *
-   * The capability already existed — resetPassword and changePassword both
-   * revoke every token in the same transaction — but only as a side effect of
-   * changing a password. Someone who left a session open on a machine they no
-   * longer have had to change their password to close it.
-   *
-   * NOT instant, and the caller has to say so. Revoking refresh tokens stops
-   * the other devices RENEWING; the access token each one is already holding
-   * is a JWT this cannot reach, and it stays valid until it expires
-   * (JWT_ACCESS_EXPIRES_IN, 1d by default). Making it instant means either a
-   * much shorter access token or a revocation check on every request, and
-   * both are decisions with a cost attached rather than something to slip in
-   * here.
-   *
-   * Returns how many sessions were closed, because "signed out of 3 other
-   * devices" is the only way the caller can tell it did anything.
-   */
+  /** Revoke all sessions and legacy tokens; access is checked on every API request. */
   async logoutAll(userId: string): Promise<{ revoked: number }> {
-    const { count } = await this.prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data:  { revokedAt: new Date() },
-    });
+    const revokedAt = new Date();
+    const [, , { count }] = await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { sessionsRevokedAt: revokedAt } }),
+      this.prisma.authSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt } }),
+      this.prisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt } }),
+    ]);
     return { revoked: count };
+  }
+
+  async listSessions(userId: string, currentSessionId?: string, page = 1) {
+    const take = 10;
+    const [sessions, total] = await this.prisma.$transaction([
+      this.prisma.authSession.findMany({
+        where: { userId }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * take, take,
+        select: { id: true, createdAt: true, expiresAt: true, revokedAt: true, ipAddress: true, userAgent: true, location: true },
+      }),
+      this.prisma.authSession.count({ where: { userId } }),
+    ]);
+    return {
+      data: sessions.map((session) => ({
+        ...session,
+        isCurrent: session.id === currentSessionId,
+        status: session.revokedAt ? 'SIGNED_OUT' : session.expiresAt <= new Date() ? 'EXPIRED' : 'ACTIVE',
+      })),
+      total, page, totalPages: Math.ceil(total / take),
+      legacySession: !currentSessionId,
+    };
+  }
+
+  async recordSessionDevice(userId: string, sessionId: string | undefined, ipAddress?: string, userAgent?: string) {
+    if (!sessionId) return;
+    // Called by the browser, so the address is the API-observed connection,
+    // not the server-to-server NextAuth login request. Capture once per sign-in.
+    await this.prisma.authSession.updateMany({
+      where: { id: sessionId, userId, revokedAt: null, ipAddress: null },
+      data: { ipAddress: ipAddress?.slice(0, 64), userAgent: userAgent?.slice(0, 512) },
+    });
+  }
+
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, userId } });
+    if (!session) throw new NotFoundException('Session not found');
+    const revokedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.authSession.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { revokedAt } }),
+      this.prisma.refreshToken.updateMany({ where: { sessionId, userId, revokedAt: null }, data: { revokedAt } }),
+    ]);
   }
 
   async logout(userId: string, refreshToken: string): Promise<void> {
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const stored = await this.prisma.refreshToken.findFirst({ where: { userId, tokenHash } });
+    if (stored?.sessionId) {
+      await this.revokeSession(userId, stored.sessionId);
+      return;
+    }
     await this.prisma.refreshToken.updateMany({
       where: { userId, tokenHash },
       data: { revokedAt: new Date() },
@@ -323,10 +353,10 @@ export class AuthService {
 
     const stored = await this.prisma.refreshToken.findFirst({
       where: { userId, tokenHash: oldHash, revokedAt: null, expiresAt: { gt: new Date() } },
-      include: { user: { select: { email: true, role: true, storeId: true } } },
+      include: { user: { select: { email: true, role: true, storeId: true } }, session: true },
     });
 
-    if (!stored) {
+    if (!stored || (stored.session && (stored.session.revokedAt || stored.session.expiresAt <= new Date()))) {
       throw new UnauthorizedException({ code: 'ERR_REFRESH_TOKEN_INVALID' });
     }
 
@@ -336,7 +366,7 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    const tokens = await this.generateTokens(userId, stored.user.email, stored.user.role, false, stored.user.storeId);
+    const tokens = await this.generateTokens(userId, stored.user.email, stored.user.role, false, stored.user.storeId, stored.sessionId ?? undefined);
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return { accessToken: tokens.accessToken };
@@ -414,7 +444,8 @@ export class AuthService {
 
     await this.prisma.$transaction([
       this.prisma.passwordReset.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash, sessionsRevokedAt: new Date() } }),
+      this.prisma.authSession.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
       // Revoke all refresh tokens for the user
       this.prisma.refreshToken.updateMany({
         where: { userId: record.userId, revokedAt: null },
@@ -444,7 +475,8 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash, sessionsRevokedAt: new Date() } }),
+      this.prisma.authSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
       this.prisma.refreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -573,7 +605,7 @@ export class AuthService {
     user: Awaited<ReturnType<AuthService['findOrCreateGoogleUser']>>,
     res: Response,
   ): Promise<AuthResponseDto> {
-    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, false, user.storeId, undefined, res.req?.headers['user-agent']);
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 
     return {
@@ -601,14 +633,22 @@ export class AuthService {
     role: string,
     rememberMe = false,
     storeId?: string | null,
+    existingSessionId?: string,
+    userAgent?: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const secret = this.config.get<string>('jwt.accessSecret');
     if (!secret) {
       throw new Error('JWT_ACCESS_SECRET environment variable is not set');
     }
 
+    const refreshDays = rememberMe ? 90 : 30;
+    const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1_000);
+    const sessionId = existingSessionId ?? (await this.prisma.authSession.create({
+      data: { userId, expiresAt, userAgent: userAgent?.slice(0, 512) },
+    })).id;
+
     const accessToken = this.jwtService.sign(
-      { sub: userId, email, role, ...(storeId ? { storeId } : {}) },
+      { sub: userId, email, role, sid: sessionId, ...(storeId ? { storeId } : {}) },
       {
         secret,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -618,11 +658,9 @@ export class AuthService {
 
     const rawRefreshToken = randomBytes(40).toString('hex');
     const tokenHash = createHash('sha256').update(rawRefreshToken).digest('hex');
-    const refreshDays = rememberMe ? 90 : 30;
-    const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1_000);
 
     await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, expiresAt, sessionId },
     });
 
     return { accessToken, refreshToken: rawRefreshToken };

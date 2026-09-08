@@ -18,10 +18,21 @@
     "tabReviews": "Reviews",
     "tabAbout": "About",
     "searchPlaceholder": "Search all {count} items",
+    "shopItems": "Shop items",
+    "announcement": "Shop announcement",
+    "announcementUpdated": "Last updated {date}",
     "about": {
       "title": "About this shop",
       "totalSales": "Total Sales",
       "activeListings": "Active Listings",
+      "onPlatformSince": "On EziHubb since",
+      "photosAndVideo": "Inside the shop",
+      "shopVideo": "A video from {name}",
+      "shopPhoto": "{name} shop photo {number}",
+      "meetTheOwner": "Meet the shop owner",
+      "shopOwner": "Shop owner",
+      "followOnline": "Find this shop online",
+      "frequentlyAskedQuestions": "Frequently asked questions",
       "noDescription": "No shop description provided yet."
     }
   },

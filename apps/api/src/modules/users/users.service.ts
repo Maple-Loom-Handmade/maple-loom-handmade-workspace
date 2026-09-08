@@ -2,11 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
   UnauthorizedException,
   Logger,
   Optional,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -15,6 +15,7 @@ import { RedisService } from '../../common/services/redis.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { TargetedOffersService } from '../marketing/targeted-offers.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { NotificationPreferencesDto } from './dto/notification-preferences.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { UpdateWishlistShareDto } from './dto/update-wishlist-share.dto';
@@ -54,6 +55,26 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException({ code: 'ERR_NOT_FOUND', message: 'User not found' });
     return UserResponseDto.fromPrisma(user);
+  }
+
+  async getNotificationPreferences(userId: string) {
+    const preferences = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { pushEnabled: true, emailMessages: true, emailReviewReminders: true, emailOffers: true },
+    });
+    if (!preferences) throw new NotFoundException('User not found');
+    return preferences;
+  }
+
+  async saveNotificationPreferences(userId: string, dto: NotificationPreferencesDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        pushEnabled: dto.pushEnabled, emailMessages: dto.emailMessages,
+        emailReviewReminders: dto.emailReviewReminders, emailOffers: dto.emailOffers,
+      },
+      select: { pushEnabled: true, emailMessages: true, emailReviewReminders: true, emailOffers: true },
+    });
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<UserResponseDto> {
@@ -336,6 +357,7 @@ export class UsersService {
               name: true,
               slug: true,
               basePrice: true,
+              isActive: true,
               images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
             },
           },
@@ -354,6 +376,7 @@ export class UsersService {
       productSlug: item.product.slug,
       productImageUrl: item.product.images[0]?.url ?? null,
       productBasePrice: Number(item.product.basePrice),
+      productIsActive: item.product.isActive,
       addedAt: item.createdAt,
     }));
 
@@ -366,12 +389,29 @@ export class UsersService {
       throw new NotFoundException({ code: 'ERR_NOT_FOUND', message: 'Product not found' });
     }
 
-    const existing = await this.prisma.wishlistItem.findFirst({ where: { userId, productId } });
+    const existing = await this.prisma.wishlistItem.findUnique({
+      where: { userId_productId: { userId, productId } },
+    });
     if (existing) {
-      throw new ConflictException({ code: 'ERR_ALREADY_IN_WISHLIST', message: 'Product is already in your wishlist' });
+      return { id: existing.id };
     }
 
-    const item = await this.prisma.wishlistItem.create({ data: { userId, productId } });
+    let item: { id: string };
+    try {
+      item = await this.prisma.wishlistItem.create({ data: { userId, productId } });
+    } catch (error) {
+      // Treat concurrent duplicate requests as the same successful, idempotent
+      // operation. This also prevents a harmless double-click from surfacing as
+      // a red 409 request in the browser console.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const concurrentItem = await this.prisma.wishlistItem.findUnique({
+          where: { userId_productId: { userId, productId } },
+          select: { id: true },
+        });
+        if (concurrentItem) return concurrentItem;
+      }
+      throw error;
+    }
 
     const storeId = product.storeId;
     if (storeId) {
@@ -497,6 +537,7 @@ export class UsersService {
         productSlug:      item.product.slug,
         productImageUrl:  item.product.images[0]?.url ?? null,
         productBasePrice: Number(item.product.basePrice),
+        productIsActive:  true,
         addedAt:          item.createdAt,
       })),
     };

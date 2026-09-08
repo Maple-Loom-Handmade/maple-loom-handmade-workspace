@@ -42,6 +42,8 @@ export class ApiRequestError extends Error {
     public readonly statusCode: number,
     message: string,
     public readonly errors?: Record<string, string[]>,
+    public readonly code?: string,
+    public readonly details?: { field: string; message: string }[],
   ) {
     super(message);
     this.name = 'ApiRequestError';

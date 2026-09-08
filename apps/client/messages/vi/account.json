@@ -237,7 +237,8 @@
     "addressBook": "Sổ địa chỉ",
     "profilePassword": "Hồ sơ & Mật khẩu",
     "myOffers": "Đề nghị của tôi",
-    "signOut": "Đăng xuất"
+    "signOut": "Đăng xuất",
+    "settings": "Cài đặt tài khoản"
   },
   "offers": {
     "title": "Đề nghị của tôi",
@@ -345,5 +346,48 @@
     "nothingSavedHint": "Yêu thích những sản phẩm bạn thích và tìm lại chúng ở đây.",
     "exploreGifts": "Khám phá quà tặng",
     "savedItems": "sản phẩm đã lưu"
+  },
+  "settings": {
+    "title": "Cài đặt tài khoản",
+    "back": "Quay lại tài khoản",
+    "profile": "Hồ sơ & bảo mật",
+    "addresses": "Địa chỉ",
+    "notifications": "Thông báo",
+    "securityTitle": "Bảo vệ tài khoản của bạn",
+    "securityHint": "Quản lý mật khẩu và thông tin tài khoản tại hồ sơ. EziHubb không bao giờ yêu cầu mật khẩu hoặc đầy đủ thông tin thanh toán qua tin nhắn.",
+    "securityNote": "Cảnh báo bảo mật qua SMS hiện chưa được hỗ trợ.",
+    "manageSecurity": "Quản lý tài khoản",
+    "browserTitle": "Thông báo trình duyệt",
+    "browserNote": "Áp dụng cho các thiết bị đã đăng ký nhận thông báo. Bạn cũng cần cho phép thông báo trong trình duyệt; lưu cài đặt này không tự cấp quyền cho trình duyệt.",
+    "emailTitle": "Cài đặt thông báo email cho {email}",
+    "emailWhen": "Gửi email cho tôi khi…",
+    "essentialNote": "Email xác nhận đơn, cập nhật thanh toán và giao hàng, đặt lại mật khẩu cùng các email thiết yếu về tài khoản vẫn được gửi. Cài đặt này không ẩn tin nhắn hay thông báo trong tài khoản.",
+    "subscriptionsTitle": "Ưu đãi & nhắc nhở mua sắm",
+    "subscriptionsHint": "Chọn nhận các email mua sắm tùy chọn. Bạn có thể thay đổi lựa chọn bất kỳ lúc nào.",
+    "pushEnabled": {
+      "label": "Nhận thông báo trình duyệt",
+      "hint": "Nhận thông báo tin nhắn và cập nhật đơn hàng trên các thiết bị đã bật tính năng này."
+    },
+    "emailMessages": {
+      "label": "Có người gửi tin nhắn cho tôi",
+      "hint": "Nhận email khi shop trả lời bạn."
+    },
+    "emailReviewReminders": {
+      "label": "Đến lúc đánh giá sản phẩm",
+      "hint": "Nhận lời nhắc chia sẻ trải nghiệm sau khi đơn hàng được giao."
+    },
+    "emailOffers": {
+      "label": "Mã giảm giá, ưu đãi và nhắc giỏ hàng",
+      "hint": "Nhận ưu đãi từ shop và lời nhắc về sản phẩm còn trong giỏ. Phản hồi cho đề nghị giá bạn đã gửi vẫn được gửi khi tắt lựa chọn này."
+    },
+    "save": "Lưu cài đặt",
+    "saving": "Đang lưu…",
+    "saved": "Đã lưu cài đặt của bạn.",
+    "unsaved": "Bạn có thay đổi chưa lưu.",
+    "saveError": "Chưa lưu được cài đặt. Các thay đổi vẫn được giữ lại — vui lòng thử lại.",
+    "loadError": "Không tải được cài đặt.",
+    "retry": "Thử lại",
+    "loading": "Đang tải cài đặt",
+    "leaveWarning": "Bạn có cài đặt chưa lưu. Rời trang mà không lưu?"
   }
 }

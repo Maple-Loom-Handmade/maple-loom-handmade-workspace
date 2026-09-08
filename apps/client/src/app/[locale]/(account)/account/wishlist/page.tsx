@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useRef } from 'react';
 import { Heart, ShoppingCart, HeartOff, Share2, Copy, Check, X, Globe } from 'lucide-react';
-import { queryKeys, useMutateCart } from '@ezihubb/api-client';
+import { queryKeys, useMutateCart, useWishlist } from '@ezihubb/api-client';
 import { API_ROUTES } from '@ezihubb/constants';
 import { useToast } from '@ezihubb/ui';
 import type { WishlistItemDto } from '@ezihubb/types';
 import { useAuthQuery, useAuthMutation } from '../../../../../lib/hooks/useAuthQuery';
+import { useAuthStore } from '../../../../../lib/store/auth.store';
 import { apiClient } from '@ezihubb/api-client';
 import { fmtAmount } from '@ezihubb/utils';
 
@@ -295,11 +296,12 @@ export default function WishlistPage() {
   const t      = useTranslations('account.wishlist');
   const locale = useLocale();
   const toast  = useToast();
+  const accessToken = useAuthStore((state) => state.accessToken);
 
-  const { data: items = [], isLoading } = useAuthQuery<WishlistItemDto[]>(
-    queryKeys.wishlist(),
-    '/users/me/wishlist',
-  );
+  // Keep the shared wishlist cache normalized as WishlistItemDto[]. Using the
+  // raw paginated endpoint here used to replace that cache with an object and
+  // crash every product card consumer that calls `.some()` on it.
+  const { data: items = [], isLoading } = useWishlist(Boolean(accessToken));
 
   const removeMutation = useAuthMutation(
     (productId: string, token: string) =>

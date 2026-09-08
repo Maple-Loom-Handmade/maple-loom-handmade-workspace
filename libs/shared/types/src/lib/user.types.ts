@@ -51,3 +51,9 @@ export interface WishlistItemDto {
     isActive: boolean;
   };
 }
+export interface NotificationPreferences {
+  pushEnabled: boolean;
+  emailMessages: boolean;
+  emailReviewReminders: boolean;
+  emailOffers: boolean;
+}

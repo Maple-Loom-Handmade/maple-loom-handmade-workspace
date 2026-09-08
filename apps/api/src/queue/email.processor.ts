@@ -7,6 +7,8 @@ import * as nodemailer from 'nodemailer';
 import * as Handlebars from 'handlebars';
 import { ConfigService } from '@nestjs/config';
 import { QUEUES, JOBS, SendEmailJobData } from './queue.constants';
+import { PrismaService } from '../prisma/prisma.service';
+import { emailPreference } from './email-preferences';
 
 @Processor(QUEUES.EMAIL)
 export class EmailProcessor extends WorkerHost {
@@ -14,7 +16,7 @@ export class EmailProcessor extends WorkerHost {
   private transporter!: nodemailer.Transporter;
   private readonly templateCache = new Map<string, Handlebars.TemplateDelegate>();
 
-  constructor(private readonly config: ConfigService) {
+  constructor(private readonly config: ConfigService, private readonly prisma: PrismaService) {
     super();
     this.initTransporter();
   }
@@ -43,6 +45,16 @@ export class EmailProcessor extends WorkerHost {
 
   private async handleSendEmail(job: Job<SendEmailJobData>): Promise<void> {
     const { to, subject, template, data } = job.data;
+
+    const preference = emailPreference(template, data);
+    if (preference) {
+      // Evaluate at delivery time, including jobs queued before a preference was changed.
+      const recipient = await this.prisma.user.findUnique({
+        where: { email: to.trim().toLowerCase() },
+        select: { pushEnabled: true, emailMessages: true, emailReviewReminders: true, emailOffers: true },
+      });
+      if (recipient && !recipient[preference]) return;
+    }
 
     this.logger.log(`Sending email: template="${template}" to="${to}" subject="${subject}"`);
 

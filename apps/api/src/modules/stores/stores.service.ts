@@ -35,6 +35,8 @@ import {
   ShippingSupportStatus,
 } from './dto/shipping-support-query.dto';
 
+const sharp = require('sharp');
+
 const SHOP_URL   = process.env['CLIENT_URL'] ?? 'https://ezihubb.com';
 const ADMIN_URL  = process.env['ADMIN_URL']  ?? 'http://localhost:3001';
 const REALIZED_SHIPPING_STATUSES: OrderStatus[] = [
@@ -46,6 +48,10 @@ const EXCLUDED_SHIPPING_STATUSES: OrderStatus[] = [
   OrderStatus.CANCELLED,
   OrderStatus.REFUNDED,
 ];
+export const STORE_BANNER_MAX_BYTES = 10 * 1024 * 1024;
+export const STORE_BANNER_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const STORE_BANNER_MAX_WIDTH = 2400;
+const STORE_BANNER_MAX_HEIGHT = 1200;
 
 @Injectable()
 export class StoresService {
@@ -200,6 +206,20 @@ export class StoresService {
         totalOrders: true, rating: true,
         createdAt: true, verifiedAt: true,
         shareSaveEnabled: true,
+        tagline: true,
+        location: true,
+        announcement: true,
+        announcementUpdatedAt: true,
+        aboutHeadline: true,
+        aboutVideoUrl: true,
+        aboutPhotoUrls: true,
+        ownerBio: true,
+        socialLinks: true,
+        owner: { select: { firstName: true, lastName: true, avatarUrl: true } },
+        faqs: {
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, question: true, answer: true, sortOrder: true },
+        },
         // Ezihubb Plus (colorTheme only — featuredProductIds stays FREE,
         // never gated; do not extend this gate to other fields without
         // confirming scope first, see docs/etsy-ui-audit.md Backlog).
@@ -250,7 +270,11 @@ export class StoresService {
       // Plus (or whose Plus lapsed while 'mixed' was stored) renders the free
       // standard grid. The stored preference is left untouched in the DB, so
       // re-subscribing restores the mixed layout — same policy as colorTheme.
-      featuredLayout: hasPlus ? (rest.featuredLayout ?? 'grid') : 'grid',
+      // "none" is a free opt-out and must remain effective after Plus lapses.
+      // Only the paid mixed layout is downgraded to the standard grid.
+      featuredLayout: hasPlus
+        ? (rest.featuredLayout ?? 'grid')
+        : (rest.featuredLayout === 'none' ? 'none' : 'grid'),
       totalProducts: _count.products,
       followerCount: _count.followers,
     };
@@ -1159,21 +1183,57 @@ export class StoresService {
 
   async adminUploadStoreBanner(storeId: string, file: Express.Multer.File) {
     if (!file) throw new BadRequestException({ code: 'ERR_FILE_REQUIRED', message: 'Banner file is required' });
+    if (file.size > STORE_BANNER_MAX_BYTES) {
+      throw new BadRequestException({
+        code: 'ERR_FILE_TOO_LARGE',
+        message: 'Banner must be smaller than 10 MB',
+      });
+    }
+    if (!STORE_BANNER_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException({
+        code: 'ERR_FILE_TYPE_INVALID',
+        message: 'Banner must be a JPEG, PNG or WebP image',
+      });
+    }
 
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
     if (!store) throw new NotFoundException('Store not found');
 
-    const key = this.storageService.generateKey(`stores/${storeId}`, file.originalname);
-    const url = await this.storageService.uploadFile(file.buffer, key, file.mimetype);
+    // Shop banners are rendered at 4:1 and never need their full camera/export
+    // resolution. Normalising before the second network hop (API -> R2/S3)
+    // avoids making the browser wait while a multi-megabyte PNG is uploaded a
+    // second time, while `fit: inside` preserves the seller's chosen crop.
+    let buffer: Buffer;
+    try {
+      buffer = await sharp(file.buffer)
+        .rotate()
+        .resize(STORE_BANNER_MAX_WIDTH, STORE_BANNER_MAX_HEIGHT, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 86 })
+        .toBuffer();
+    } catch {
+      throw new BadRequestException({
+        code: 'ERR_FILE_INVALID',
+        message: 'Banner image could not be read',
+      });
+    }
+    const webpName = file.originalname.replace(/\.[^.]+$/, '') + '.webp';
+    const key = this.storageService.generateKey(`stores/${storeId}`, webpName);
+    const url = await this.storageService.uploadFile(buffer, key, 'image/webp');
 
-    const updated = await this.prisma.store.update({
+    await this.prisma.store.update({
       where: { id: storeId },
       data:  { bannerUrl: url },
     });
 
     this.moderationService?.queueStoreImageModeration(storeId, url, 'banner').catch((e) => this.logger.error('mod queue failed', e));
 
-    return { bannerUrl: url, store: updated };
+    // The editor only needs the canonical URL. Returning the full raw Store
+    // record made it tempting for callers to replace a richer cached store
+    // (owner, FAQs, counts) with an incomplete object.
+    return { bannerUrl: url };
   }
 
   async adminUploadStoreLogo(storeId: string, file: Express.Multer.File) {
